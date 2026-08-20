@@ -63,13 +63,17 @@ public class MoveGenerator
 			}
 			else
 			{
-				// TODO(bugfix pass): missing FRow+dir bounds check here. A pawn that reaches the
-				// last rank (promotion isn't implemented yet) crashes the next time this runs (AUDIT.md #2)
+				// Bounds check added here to match the takes branch above: without it, a pawn that
+				// reaches the last rank (promotion still isn't implemented) would crash the next time
+				// this runs instead of just having no forward move available.
 				//first move (normal)
-				if(((Board[FRow+dir][FColumn].equals("  ")))||((Board[FRow+dir][FColumn].equals("##"))))
+				if((FRow+dir<8)&&(FRow+dir>-1))
 				{
-					rows.add(FRow+dir);
-					columns.add(FColumn);
+					if(((Board[FRow+dir][FColumn].equals("  ")))||((Board[FRow+dir][FColumn].equals("##"))))
+					{
+						rows.add(FRow+dir);
+						columns.add(FColumn);
+					}
 				}
 				//if on starting spot 2 moves up
 				if(FRow==startRow)
@@ -704,23 +708,15 @@ public class MoveGenerator
 				break;
 			}
 		}
-		// TODO(bugfix pass): this loop's condition is never true when rows.size()>0, so it never
-		// actually strips the 88 separators, which means stalemate is almost never detected while a
-		// rook/bishop/queen remains on the board (AUDIT.md #5)
-		for(int i=rows.size(); i<=0; i++)
+		// Strips the 88 separator markers that sliding pieces (rook/bishop/queen) leave between
+		// each direction they scanned, so they don't get counted as real legal moves below.
+		// Walking backward means removing an entry never shifts an index we still need to visit.
+		for(int i=rows.size()-1; i>=0; i--)
 		{
-			if(rows.size()==0)
-			{
-				break;
-			}
 			if(rows.get(i)==88)
 			{
 				rows.remove(i);
 				columns.remove(i);
-				if(rows.size()==0)
-				{
-					break;
-				}
 			}
 		}
 		if(rows.size()==0)
@@ -820,6 +816,34 @@ public class MoveGenerator
 						}
 					}
 
+				}
+			}
+		}
+		// A king always threatens its own 8 surrounding squares, regardless of whether moving there
+		// would actually be safe for it, so the two kings are never marked here as attacking each
+		// other through LegalMoves() (that would recompute this same safety question for the enemy
+		// king and never finish). Instead the enemy king's neighboring squares are marked directly,
+		// which stops the two kings from ever being allowed to stand next to each other.
+		for(int r=0; r<Board.length; r++)
+		{
+			for(int c=0; c<Board[0].length; c++)
+			{
+				if(Board[r][c].equals(enemy+"K"))
+				{
+					for(int dr=-1; dr<=1; dr++)
+					{
+						for(int dc=-1; dc<=1; dc++)
+						{
+							if((dr!=0)||(dc!=0))
+							{
+								int kr=r+dr, kc=c+dc;
+								if((kr>-1)&&(kr<8)&&(kc>-1)&&(kc<8))
+								{
+									KMoves[kr][kc]="XX";
+								}
+							}
+						}
+					}
 				}
 			}
 		}
@@ -935,6 +959,10 @@ public class MoveGenerator
 				board.equalBoard(Board, Protect);
 				Protect[rows.get(i)][columns.get(i)]=color+"K";
 				Protect[FRow][FColumn]="  ";
+				// Labeled so an unsafe candidate can jump straight back out to the i loop below
+				// instead of just breaking the innermost loop and continuing to needlessly scan
+				// the rest of the enemy pieces against a candidate that's already been rejected.
+				candidateScan:
 				for(int r=0; r<Board.length; r++)
 				{
 					for(int c=0; c<Board[0].length; c++)
@@ -963,36 +991,18 @@ public class MoveGenerator
 
 								if((rows2.get(j)!=88)&&(Protect[rows2.get(j)][columns2.get(j)].equals(color+"K")))
 								{
-									// TODO(bugfix pass): White's original version was missing the size check
-									// guard that Black's version had here, which can let a second unsafe king
-									// square slip through unfiltered (AUDIT.md #7). Preserved as a color branch
-									// for now.
-									if(color.equals("B"))
-									{
-										if(!(i>=rows.size()))
-										{
-											rows.remove(i);
-											columns.remove(i);
-											break;
-										}
-									}
-									else
-									{
-										rows.remove(i);
-										columns.remove(i);
-										break;
-									}
+									// Removing index i shifts the next candidate into that same
+									// index, so i is stepped back by one here to land on it again
+									// next time round the i loop instead of skipping past it, which
+									// used to let a second unsafe square slip through unfiltered
+									// (AUDIT.md #7).
+									rows.remove(i);
+									columns.remove(i);
+									i--;
+									break candidateScan;
 								}
 							}
-							if(rows.size()==0)
-							{
-								break;
-							}
 						}
-					}
-					if(rows.size()==0)
-					{
-						break;
 					}
 				}
 			}
@@ -1148,13 +1158,7 @@ public class MoveGenerator
 							{
 								check=true;
 								//normal
-								// TODO(bugfix pass): White's original version never set BkTRow here (only
-								// BkTColumn), which corrupts White's king escape square lookup once the White
-								// king has moved off row 0 (AUDIT.md #4). Preserved as a color branch for now.
-								if(color.equals("B"))
-								{
-									BkTRow=rows.get(i);
-								}
+								BkTRow=rows.get(i);
 								BkTColumn=columns.get(i);
 								CheckerRow=r;
 								CheckerColumn=c;
@@ -1213,13 +1217,12 @@ public class MoveGenerator
 										columnsneeded.add(columns.get(d));
 									}
 								}
-								if(found)
-									break;
-								else
-								{
-									rowsneeded.clear();
-									columnsneeded.clear();
-								}
+								// This used to break out of the enemy-piece scan entirely as soon as one
+								// checking slider's blocking squares were computed. If a second checker sat
+								// later in that same row (a real double check), the scan would stop before
+								// ever reaching it, so doublecheck never counted past 1 and the double-check
+								// fix above never triggered. Letting the scan continue instead lets every
+								// checking piece actually get counted.
 							}
 						}
 					}
@@ -1239,42 +1242,39 @@ public class MoveGenerator
 		boolean checkmate=false;
 		CheckcolumnsAndRows=KingLegalMovesThretened(BkTRow,BkTColumn, Board, color);
 		checkmate=KingInCheckMate(Board, columnsAndRowsneeded, color);
+		if(doublecheck>1)
+		{
+			// In a genuine double check, blocking or capturing one attacking piece never resolves
+			// the other attack at the same time, so blocking/capturing is never a legal response,
+			// only moving the king is. Without this, canBlock above could count a block or capture
+			// that only stops one of the two checks, wrongly turning a real double checkmate into
+			// "just move your king" (AUDIT.md #6).
+			checkmate=false;
+		}
+		// The leftover numbered println calls that used to live here (only on White's original code
+		// path) were just debug output left in by mistake, so they were removed rather than kept.
 		if(check)
 		{
 			int amount=0;
-			// TODO(bugfix pass): the numbered println calls below only ever existed in White's original
-			// code path (WKingInCheck). Black's had none. Preserved as a color branch so turn output
-			// doesn't silently change; these look like leftover debug prints worth removing later.
 			if((CheckcolumnsAndRows.size()==0)&&(checkmate))
 			{
 				//no king move so block or take by piece
 				amount=11;
-				if(color.equals("W")) System.out.println("1st");
 			}
 			if((CheckcolumnsAndRows.size()>0)&&(!checkmate))
 			{
 				//king move
 				amount=33;
-				if(color.equals("W")) System.out.println("2nd");
 			}
 			if((CheckcolumnsAndRows.size()>0)&&(checkmate))
 			{
 				//king move or block or take by piece
 				amount=22;
-				if(color.equals("W")) System.out.println("3rd");
 			}
-			if(doublecheck>1)
-			{
-				//king must move
-				amount=33;
-				if(color.equals("W")) System.out.println("4th");
-			}
-			if(color.equals("W")) System.out.println(CheckcolumnsAndRows.size());
 			if((CheckcolumnsAndRows.size()==0)&&(!checkmate))
 			{
 				//check mate
 				amount=44;
-				if(color.equals("W")) System.out.println("5th");
 			}
 			columnsAndRowsneeded.add(amount);
 		}

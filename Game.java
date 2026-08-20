@@ -24,8 +24,8 @@ public class Game
 		columns.clear();
 		columnsAndRows1.clear();
 		boolean noKingMove=false, kingMustMove=false, blockOrKingMove=false, end=false;
-		// TODO(bugfix pass): Wmove and Bmove originally ran this preamble (turn announcement, stalemate
-		// checks, check-status message) in a different order per color — preserved exactly per color here
+		// Wmove and Bmove originally ran this preamble (turn announcement, stalemate checks,
+		// check-status message) in a different order per color. Preserved exactly per color here
 		// rather than picking one order, since that would be a behavior change, not just a dedup.
 		if(color.equals("W"))
 		{
@@ -143,22 +143,26 @@ public class Game
 		{
 			System.out.println("Enter the location of a "+(color.equals("W")?"white":"black")+" piece please");
 			move(board, wLost, bLost, color);
+			return;
 		}
 		//if the space you chose is empty choose again
 		if(((board[row][column-97].equals("  ")))||((board[row][column-97].equals("##"))))
 		{
 			System.out.println("Empty Spot: Enter the location of a piece please");
 			move(board, wLost, bLost, color);
+			return;
 		}
 		if((board[row][column-97].equals(color+"K"))&&(noKingMove))
 		{
 			System.out.println("No legal moves for "+(color.equals("W")?"White":"Black")+" king: Enter the location of a new piece please");
 			move(board, wLost, bLost, color);
+			return;
 		}
 		else if(!(board[row][column-97].equals(color+"K"))&&(kingMustMove))
 		{
 			System.out.println("No other legal moves except for "+(color.equals("W")?"White":"Black")+" king: Enter the location of the "+(color.equals("W")?"white":"black")+" king please ");
 			move(board, wLost, bLost, color);
+			return;
 		}
 		int FRow=row, FColumn=(int)(column-97);
 		column=32;
@@ -210,6 +214,7 @@ public class Game
 			{
 				System.out.println("Must block the check!");
 				move(board, wLost, bLost, color);
+				return;
 			}
 		}
 		if(noKingMove)
@@ -236,6 +241,7 @@ public class Game
 			{
 				System.out.println("Must block the check!");
 				move(board, wLost, bLost, color);
+				return;
 			}
 		}
 		boolean isCorrect=false;
@@ -263,6 +269,7 @@ public class Game
 			{
 				System.out.println("Error: This Move caused your king to be checked pick a new spot to move");
 				move(board, wLost, bLost, color);
+				return;
 			}
 		}
 		if(isCorrect)
@@ -307,19 +314,20 @@ public class Game
 			}
 			//print board after finding legal move
 			boardUtil.print(board, wLost, bLost);
-			// TODO(bugfix pass): original Wmove chained straight into Bmove here, so one successful White
-			// move immediately continued into Black's turn; Bmove had no equivalent call (ChessMain's outer
-			// loop calls Wmove again instead) — preserved exactly, only White chains forward.
+			// A successful White move chains straight into Black's turn here; ChessMain's outer loop
+			// is what calls White's turn again after Black finishes, so Black doesn't chain forward.
 			if(color.equals("W"))
 			{
 				move(board, wLost, bLost, "B");
 			}
+			return;
 		}
 		else
 		{
 			//illegal move, send back to top of move
 			System.out.println("Illegal Move: Enter a valid location to move your piece");
 			move(board, wLost, bLost, color);
+			return;
 		}
 	}
 }
