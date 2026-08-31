@@ -5,11 +5,25 @@ public class Game
 {
 	private Board boardUtil;
 	private MoveGenerator moveGen;
+	private ChessAI ai;
+	private String aiColor;
 
 	public Game(Board boardUtil, MoveGenerator moveGen)
 	{
 		this.boardUtil = boardUtil;
 		this.moveGen = moveGen;
+		this.ai = null;
+		this.aiColor = null;
+	}
+
+	// Used for a Human vs AI game. aiColor is which color the AI plays, the other color is
+	// still entered by a human at the console exactly as before.
+	public Game(Board boardUtil, MoveGenerator moveGen, ChessAI ai, String aiColor)
+	{
+		this.boardUtil = boardUtil;
+		this.moveGen = moveGen;
+		this.ai = ai;
+		this.aiColor = aiColor;
 	}
 
 	//move (was Wmove/Bmove, merged by color)
@@ -96,98 +110,114 @@ public class Game
 				System.exit(0);
 			}
 		}
-		Scanner reader = new Scanner(System.in);
-		char column=32;
-		int row=0;
-		//find piece you want to move
-		while((row<1)||(row>8))
+		int FRow, FColumn, SRow, SColumn;
+		if(!color.equals(aiColor))
 		{
-			System.out.println("Enter the row of the piece you wish to move (Number 1-8) (0 - Resign) (-1 - Propose draw)");
-			row=reader.nextInt();
-			if(row==0)
+			Scanner reader = new Scanner(System.in);
+			char column=32;
+			int row=0;
+			//find piece you want to move
+			while((row<1)||(row>8))
 			{
-				System.out.println((color.equals("W")?"White":"Black")+" resigns!");
-				System.exit(0);
-				row=-23;
-			}
-			if(row==-1)
-			{
-				System.out.println((color.equals("W")?"White":"Black")+" Proposes Draw!");
-				char yn='i';
-				while((yn!='y')&&(yn!='n'))
+				System.out.println("Enter the row of the piece you wish to move (Number 1-8) (0 - Resign) (-1 - Propose draw)");
+				row=reader.nextInt();
+				if(row==0)
 				{
-					System.out.println("Does "+(color.equals("W")?"Black":"White")+" accept? (y/n)");
-					yn=reader.next().charAt(0);
-				}
-				if(yn=='y')
-				{
-					System.out.println("Its a draw!");
+					System.out.println((color.equals("W")?"White":"Black")+" resigns!");
 					System.exit(0);
+					row=-23;
 				}
-				else
+				if(row==-1)
 				{
-					System.out.println((color.equals("W")?"Black":"White")+" declines");
+					System.out.println((color.equals("W")?"White":"Black")+" Proposes Draw!");
+					char yn='i';
+					while((yn!='y')&&(yn!='n'))
+					{
+						System.out.println("Does "+(color.equals("W")?"Black":"White")+" accept? (y/n)");
+						yn=reader.next().charAt(0);
+					}
+					if(yn=='y')
+					{
+						System.out.println("Its a draw!");
+						System.exit(0);
+					}
+					else
+					{
+						System.out.println((color.equals("W")?"Black":"White")+" declines");
+					}
+					row=-23;
 				}
-				row=-23;
 			}
-		}
-		//must go down one 0-7
-		row--;
-		while((column<97)||(column>104))
-		{
-			System.out.println("Enter the column of the piece you wish to move (character a-h)");
-			column=reader.next().charAt(0);
-		}
-		//check if own color
-		if((board[row][column-97].substring(0,1).equals(enemy)))
-		{
-			System.out.println("Enter the location of a "+(color.equals("W")?"white":"black")+" piece please");
-			move(board, wLost, bLost, color);
-			return;
-		}
-		//if the space you chose is empty choose again
-		if(((board[row][column-97].equals("  ")))||((board[row][column-97].equals("##"))))
-		{
-			System.out.println("Empty Spot: Enter the location of a piece please");
-			move(board, wLost, bLost, color);
-			return;
-		}
-		if((board[row][column-97].equals(color+"K"))&&(noKingMove))
-		{
-			System.out.println("No legal moves for "+(color.equals("W")?"White":"Black")+" king: Enter the location of a new piece please");
-			move(board, wLost, bLost, color);
-			return;
-		}
-		else if(!(board[row][column-97].equals(color+"K"))&&(kingMustMove))
-		{
-			System.out.println("No other legal moves except for "+(color.equals("W")?"White":"Black")+" king: Enter the location of the "+(color.equals("W")?"white":"black")+" king please ");
-			move(board, wLost, bLost, color);
-			return;
-		}
-		int FRow=row, FColumn=(int)(column-97);
-		column=32;
-		row=0;
-		//ask for space to wish to move to
-		//row
-		while((row<1)||(row>8))
-		{
-			System.out.println("Enter the row of where you want to move your piece (Number 1-8) (Enter 88 for posible moves)");
-			row=reader.nextInt();
-			if(row==88)
+			//must go down one 0-7
+			row--;
+			while((column<97)||(column>104))
 			{
-				moveGen.ShowLegalMoves(FRow, FColumn, board);
+				System.out.println("Enter the column of the piece you wish to move (character a-h)");
+				column=reader.next().charAt(0);
 			}
-		}
-		//column
-		while((column<97)||(column>104))
-		{
-			System.out.println("Enter the column of where you want to move your piece (character a-h)");
-			column=reader.next().charAt(0);
-		}
+			//check if own color
+			if((board[row][column-97].substring(0,1).equals(enemy)))
+			{
+				System.out.println("Enter the location of a "+(color.equals("W")?"white":"black")+" piece please");
+				move(board, wLost, bLost, color);
+				return;
+			}
+			//if the space you chose is empty choose again
+			if(((board[row][column-97].equals("  ")))||((board[row][column-97].equals("##"))))
+			{
+				System.out.println("Empty Spot: Enter the location of a piece please");
+				move(board, wLost, bLost, color);
+				return;
+			}
+			if((board[row][column-97].equals(color+"K"))&&(noKingMove))
+			{
+				System.out.println("No legal moves for "+(color.equals("W")?"White":"Black")+" king: Enter the location of a new piece please");
+				move(board, wLost, bLost, color);
+				return;
+			}
+			else if(!(board[row][column-97].equals(color+"K"))&&(kingMustMove))
+			{
+				System.out.println("No other legal moves except for "+(color.equals("W")?"White":"Black")+" king: Enter the location of the "+(color.equals("W")?"white":"black")+" king please ");
+				move(board, wLost, bLost, color);
+				return;
+			}
+			FRow=row;
+			FColumn=(int)(column-97);
+			column=32;
+			row=0;
+			//ask for space to wish to move to
+			//row
+			while((row<1)||(row>8))
+			{
+				System.out.println("Enter the row of where you want to move your piece (Number 1-8) (Enter 88 for posible moves)");
+				row=reader.nextInt();
+				if(row==88)
+				{
+					moveGen.ShowLegalMoves(FRow, FColumn, board);
+				}
+			}
+			//column
+			while((column<97)||(column>104))
+			{
+				System.out.println("Enter the column of where you want to move your piece (character a-h)");
+				column=reader.next().charAt(0);
+			}
 
-		//2nd move
-		row--;
-		int SRow=row, SColumn=(int)(column-97);
+			//2nd move
+			row--;
+			SRow=row;
+			SColumn=(int)(column-97);
+		}
+		else
+		{
+			//AI's turn, no console prompts needed, its move is already fully legal by construction
+			int[] aiMove = ai.findBestMove(board, color);
+			FRow=aiMove[0];
+			FColumn=aiMove[1];
+			SRow=aiMove[2];
+			SColumn=aiMove[3];
+			System.out.println((color.equals("W")?"White":"Black")+" (AI) moves "+(char)(FColumn+97)+(FRow+1)+" to "+(char)(SColumn+97)+(SRow+1));
+		}
 		boolean blockOrTake=false;
 
 		if((blockOrKingMove)&&(!(board[FRow][FColumn].equals(color+"K"))))
@@ -274,7 +304,10 @@ public class Game
 		}
 		if(isCorrect)
 		{
-			System.out.println("This move is legal!\n");
+			if(!color.equals(aiColor))
+			{
+				System.out.println("This move is legal!\n");
+			}
 			///switch
 
 			//move dead pieces
